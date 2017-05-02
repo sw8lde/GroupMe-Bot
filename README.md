@@ -14,11 +14,11 @@
 	* @guys
   * Display statistics on the group
 	* @stats
-	* @stats <number of messages to analyze>
-	* @stats @<user name>
-	* @stats @<user name> <number of messages to analyze>
+	* @stats "number of messages to analyze"
+	* @stats @"user name"
+	* @stats @"user name" "number of messages to analyze"
   * Post gifs from Giphy
-    * #<search term>
+    * #"search term"
 
 # Get your bot up and running
 
@@ -54,7 +54,7 @@ Then click edit and fill out the form to add an environment variable to your app
   * In the "value" field paste your Bot ID
   * Click the save button
 
-Next go back to the bot page on the GroupMe developer site, and add the callback url to your bot. The callback url should just be http://<your app name>.herokuapp.com/
+Next go back to the bot page on the GroupMe developer site, and add the callback url to your bot. The callback url should just be http://"your app name".herokuapp.com/
   
 Then go to the package.json file and change the repository url to the url of your repository and the name to the name of the heroku app you just create.
 
