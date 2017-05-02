@@ -1,0 +1,26 @@
+{
+  "name": "groupmebot",
+  "version": "0.1.0",
+  "description": "A simple GroupMe bot",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "director": "",
+    "sprintf-js": "^1.0.3"
+  },
+  "engines": {
+    "node": "0.10.x"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sw8lde/GroupMe_Bot"
+  },
+  "keywords": [
+    "node",
+    "heroku",
+    "express"
+  ],
+  "license": "MIT"
+}
