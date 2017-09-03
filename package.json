@@ -1,5 +1,5 @@
 {
-  "name": "groupmebot",
+  "name": "bot",
   "version": "0.1.0",
   "description": "A simple GroupMe bot",
   "main": "src/index.js",
@@ -11,11 +11,11 @@
     "sprintf-js": "^1.0.3"
   },
   "engines": {
-    "node": "0.10.x"
+    "node": "6.11.0"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/sw8lde/GroupMe_Bot"
+    "url": "https://github.com/sw8lde/GroupMe-Bot"
   },
   "keywords": [
     "node",

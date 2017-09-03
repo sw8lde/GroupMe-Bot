@@ -1,19 +1,19 @@
-var HTTPS = require('https');
-var config = require('./config.js');
+const HTTPS = require('https'),
+			config = require('./config.js');
 
-function all(callback) {
-	var url = 'https://api.groupme.com/v3/groups/' + config.GROUP_ID + '?token=' + config.ACCESS_TOKEN;
+function all(cb) {
+	const url = `https://api.groupme.com/v3/groups/${config.GROUP_ID}?token=${config.ACCESS_TOKEN}`;
 
-	HTTPS.get(url, function(res) {
-		var resp = "";
+	HTTPS.get(url, res => {
+		let resp = '';
 
-		res.on('data', function(chunk) {
+		res.on('data', chunk => {
 			resp += chunk;
 		});
 
-		res.on('end', function() {
-			var info = JSON.parse(resp);
-			var body = {
+		res.on('end', () => {
+			const info = JSON.parse(resp);
+			let body = {
 				"bot_id": config.BOT_ID,
 				"text": "@everyone",
 				"attachments": [{
@@ -22,19 +22,16 @@ function all(callback) {
 					"user_ids": []
 				}]
 			};
-			var member, lociIndex = 0;
 
-			for(var i = 0; i < info.response.members.length; i++) {
-				body.attachments[0].user_ids.push(info.response.members[i].user_id);
+			info.response.members.forEach(member => {
+				body.attachments[0].user_ids.push(member.user_id);
 				body.attachments[0].loci.push([0, 9]);
-			}
-			
-			console.log(body);
-			console.log(body.attachments[0].user_ids);
-			callback(body);
+			});
+
+			cb(body);
 		});
-	}).on('error', function(e){
-		console.log("Got an error: ", e);
+	}).on('error', err => {
+		console.log('Got an error: ', err);
 	});
 }
 

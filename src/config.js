@@ -1,4 +1,5 @@
-exports.BOT_ID = "BOT_ID";
-exports.GROUP_ID = "GROUP_ID";
-exports.ACCESS_TOKEN = "YOUR_ACCESS_TOKE";
+exports.ACCESS_TOKEN = "{Access token}";
+exports.BOT_ID = "{Bot ID}";
 exports.DEFAULT_MSGS_TO_ANALYZE = "2000";
+export.GIPHY_API_KEY = '{Giphy key}'
+exports.GROUP_ID = "{Group ID}";

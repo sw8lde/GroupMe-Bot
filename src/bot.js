@@ -1,124 +1,130 @@
-var HTTPS = require('https');
-var config = require('./config.js');
-var mention = require('./mention.js');
-var stats = require('./stats.js');
-var giphy = require('./giphy.js');
+const HTTPS = require('https'),
+	config = require('./config.js'),
+	mention = require('./mention.js'),
+	stats = require('./stats.js'),
+	giphy = require('./giphy.js');
 
 function respond() {
-	var message = JSON.parse(this.req.chunks[0]),
+	const msg = JSON.parse(this.req.chunks[0]),
 		botRegex = /Bot/i,
 		mentionRegex = /(@all|@everyone|@guys)/i,
-		statsRegex = /@stats/i,
-        meRegex = /@me/i;
+		statsRegex = /@stats/i;
 
-	if(message.text && botRegex.test(message.text)) {
-		console.log('call: CSSA Bot');
+	if(!msg.text) return;
+	const txt = msg.text;
+
+	if(botRegex.test(txt)) {
 		this.res.writeHead(200);
-		postMessage(":)");
-		this.res.end();
-	} else if(message.text && statsRegex.test(message.text)) {
-		var numMsgs, userIds = [];
-
-		console.log("call: stats");
+		console.log('call: Bot');
+		postMsg(':)');
+		this.res.end('responded to bot');
+	} else if(statsRegex.test(txt)) {
 		this.res.writeHead(200);
-		postMessage("Starting analysis...");
-
-		numMsgs = message.text.match(/\d+/);
-		if(numMsgs) {
-			numMsgs = numMsgs[0];
-		}
-
-		if((new RegExp(message.name, 'i')).test(message.text) || meRegex.test(message.text)) {
-			userIds = [message.sender_id];
-		}
-
-		message.attachments.forEach(function(attachment) {
-		if(attachment.user_ids) {
-			userIds = userIds.concat(attachment.user_ids);
-		}
-		});
-
-		if(mentionRegex.test(message.text)) {
-			userIds = "all";
-		}
-
-		try {
-			if(userIds.length > 0) {
-				stats.startUserAnalysis(userIds, numMsgs, postMessage);
-			} else {
-				stats.startGroupAnalysis(numMsgs, postMessage);
-			}
-		} catch(err) {
-			postMessage('Unexpected error.');
-			console.log('err: ' + err);
-		}
-		this.res.end();
-	} else if(message.text && mentionRegex.test(message.text)) {
+		console.log('call: stats');
+		postMsg('Starting analysis...');
+		getStats(msg);
+		this.res.end('posted stats');
+	} else if(mentionRegex.test(txt)) {
+		this.res.writeHead(200);
 		console.log('call: mention all');
+		mention.all(postMsg);
+		this.res.end('mentioned all');
+	} else if(txt.indexOf('#') > -1) {
 		this.res.writeHead(200);
-		mention.all(postMessage);
-		this.res.end();
-	} else if(message.text && message.text.indexOf('#') > -1) {
-		var msg = message.text, search = "";
-
 		console.log('call: giphy');
-		this.res.writeHead(200);
+		let search = '',
+			tags = txt;
 
-		while(msg.indexOf('#') > -1) {
-			var newTag;
-			msg = msg.substring(msg.indexOf('#') + 1);
-			newTag = msg.split(/\s+/)[0].replace(/\W/g, '');
+		while(tags.indexOf('#') > -1) {
+			let newTag;
+			tags = tags.substring(tags.indexOf('#') + 1);
+			newTag = tags.split(/\s+/)[0].replace(/\W/g, '');
 			if(newTag.length > 0) {
-				search += "+" + newTag;
+				search += `+${newTag}`;
 			}
-    }
-    
-		giphy.getRandom(search.substring(1), postMessage);
-		this.res.end();
-    } else {
-		console.log("call: none");
-		this.res.writeHead(200);
-		this.res.end();
+		}
+
+		if(search.toLowerCase() === '+trending')
+			giphy.getTrending(postMsg);
+		else
+			giphy.getRandom(search.substring(1), postMsg);
+		this.res.end('posted gif');
 	}
 }
 
-function postMessage(body) {
-  var options, botReq;
+function getStats(msg) {
+	const txt = msg.text,
+				mentionRegex = /(@all|@everyone|@guys)/i,
+				meRegex = /@me/i;
+	let numMsgs, userIds;
 
-  if(typeof body === "string") {
-	body = {
-	"bot_id" : config.BOT_ID,
-	"text" : body
+	(numMsgs = txt.match(/\d+/)) && (numMsgs=numMsgs[0]);
+
+	if((new RegExp(msg.name, 'i')).test(txt) || meRegex.test(txt)) {
+		userIds = [msg.sender_id];
+	}
+
+
+	if(mentionRegex.test(txt)) {
+		userIds = "all";
+	} else {
+		userIds = msg.attachments.reduce((arr, att) => {
+		    if(att) {
+		        return arr.concat(att.user_ids);
+		    }
+		}, userIds || []);
+	}
+
+	try {
+		if(userIds.length > 0) {
+			stats.startUserAnalysis(userIds, numMsgs || config.DEFAULT_MSGS_TO_ANALYZE, postMsg);
+		} else {
+			stats.startGroupAnalysis(numMsgs || config.DEFAULT_MSGS_TO_ANALYZE, postMsg);
+		}
+	} catch(err) {
+		console.log('err getting stats: ', err);
+		postMsg('Unexpected error.');
+	}
+}
+
+function postMsg(body) {
+	const options = {
+		hostname: 'api.groupme.com',
+		path: '/v3/bots/post',
+		method: 'POST',
+
 	};
-  } else if(typeof body === "undefined") {
-	body = {
-	"bot_id" : config.BOT_ID,
-	"text" : "Error"
-	};
-  }
-  
-  options = {
-	hostname: 'api.groupme.com',
-	path: '/v3/bots/post',
-	method: 'POST'
-  };
 
-  botReq = HTTPS.request(options, function(res) {
-	  if(res.statusCode == 202) {
-		//neat
-	  } else {
-		console.log('rejecting bad status code ' + res.statusCode);
-	  }
-  });
+	if(typeof body === 'string') {
+		body = {
+			'bot_id': config.BOT_ID,
+			'text': body
+		};
+	} else if(typeof body === 'undefined') {
+		body = {
+			'bot_id': config.BOT_ID,
+			'text': 'I don\'t know man.'
+		};
+	}
 
-  botReq.on('error', function(err) {
-	console.log('error posting message '  + JSON.stringify(err));
-  });
-  botReq.on('timeout', function(err) {
-	console.log('timeout posting message '  + JSON.stringify(err));
-  });
-  botReq.end(JSON.stringify(body));
+	request(options, body);
+}
+
+function request(options, body) {
+	let botReq = HTTPS.request(options, res => {
+		if(res.statusCode != 202) {
+			console.log(`rejecting bad status code ${res.statusCode} ${res.statusMessage}`);
+		}
+	});
+
+	botReq.on('error', err => {
+		console.log('error posting message ' + JSON.stringify(err));
+	});
+	botReq.on('timeout', err => {
+		console.log('timeout posting message ' + JSON.stringify(err));
+	});
+	botReq.end(JSON.stringify(body));
 }
 
 exports.respond = respond;
-exports.postMessage = postMessage;
+exports.postMsg = postMsg;

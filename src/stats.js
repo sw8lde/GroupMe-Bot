@@ -1,144 +1,177 @@
-var HTTPS = require('https'),
-	config = require('./config.js'),
-	sprintf = require('sprintf-js').sprintf,
-	userDict = {'ids': []},
-	count = 0,
-	numTotal,
-	finalFunction,
-	finalCallback,
-	userIds;
+const HTTPS = require('https'),
+			config = require('./config.js'),
+			sprintf = require('sprintf-js').sprintf;
+let userDict = {'ids': []};
 
-function initGroup() {
-	var groupUrl = 'https://api.groupme.com/v3/groups/' + config.GROUP_ID + '?token=' + config.ACCESS_TOKEN,
-		options = {
-			hostname: 'api.groupme.com',
-			path: '/v3/groups/' + config.GROUP_ID + '/messages?token=' + config.ACCESS_TOKEN + '&limit=100',
-			method: 'GET'
-		};
-
-	HTTPS.get(groupUrl, function(res) {
-		var resp = "";
-
-		res.on('data', function(chunk) {
-			resp += chunk;
-		});
-
-		res.on('end', function() {
-			var info = JSON.parse(resp);
-			count = info.response.messages.count;
-
-			info.response.members.forEach(function(member) {
-				userDict['ids'].push(member.user_id);
-				// id: [name, msgs sent, msg length, liked msgs, likes given, likes received, self-likes]
-				userDict[member.user_id] = [member.nickname, 0, 0, 0, 0, 0, 0];
-			});
-
-			if(userIds == 'all') {
-				userIds = userDict['ids'];
-			}
-
-			getMsgs([], options, getMsgs);
-		});
-	}).on('error', function(e){
-		console.log("Got an error: ", e);
+function startGroupAnalysis(numMsgs, cb) {
+	new Promise(resolve => {
+		initGroup(numMsgs, resolve);
+	})
+	.then(msgs => {
+		analyzeGroup(msgs, cb);
 	});
 }
 
-function getMsgs(msgs, options, callback) {
-	var basePath = '/v3/groups/' + config.GROUP_ID + '/messages?token=' + config.ACCESS_TOKEN + '&limit=100'
+function startUserAnalysis(userIds, numMsgs, cb) {
+	new Promise(resolve => {
+		initGroup(numMsgs, resolve);
+	})
+	.then(msgs => {
+		analyzeUsers(userIds, msgs, cb);
+	});
+}
 
-	HTTPS.get(options, function(res) {
-			var resp = "";
+function initGroup(numMsgs, cb) {
+	new Promise((resolve, reject) => {
+		const groupUrl = `https://api.groupme.com/v3/groups/${config.GROUP_ID}?token=${config.ACCESS_TOKEN}`,
+			options = {
+				hostname: 'api.groupme.com',
+				path: `/v3/groups/${config.GROUP_ID}/messages?token=${config.ACCESS_TOKEN}&limit=100`,
+				method: 'GET'
+			};
 
-			res.on('data', function(chunk) {
+		HTTPS.get(groupUrl, res => {
+			let resp = '';
+
+			res.on('data', chunk => {
 				resp += chunk;
 			});
 
-			res.on('end', function() {
-				var info = JSON.parse(resp);
-				msgs = msgs.concat(info.response.messages);
+			res.on('end', () => {
+				const info = JSON.parse(resp);
+				count = info.response.messages.count;
 
-				if(msgs.length >= numTotal || msgs.length == count) {
-					finalFunction(msgs);
-				} else {
-					options.path = basePath + '&before_id=' + info.response.messages[info.response.messages.length - 1].id;
-					callback(msgs, options, getMsgs);
-				}
+				info.response.members.forEach(function(member) {
+					userDict.ids.push(member.user_id);
+					userDict[member.user_id] = {
+						name: member.nickname,
+						sent: 0,
+						msg_length: 0,
+						liked_msgs: 0,
+						likes_given: 0,
+						likes_got: 0,
+						self_likes: 0
+					};
+				});
+
+				resolve();
 			});
-		}).on('error', function(e){
-			console.log("Got an error: ", e);
-		});
+		}).on('error', reject);
+	})
+	.then(() => {
+		const baseUrl = `/v3/groups/${config.GROUP_ID}/messages?token=${config.ACCESS_TOKEN}&limit=100`,
+			options = {
+				hostname: 'api.groupme.com',
+				path: `/v3/groups/${config.GROUP_ID}/messages?token=${config.ACCESS_TOKEN}&limit=100`,
+				method: 'GET'
+			};
+
+		function getMsgs(msgs, ops, callback) {
+			HTTPS.get(ops, res => {
+					var resp = '';
+
+					res.on('data', chunk => {
+						resp += chunk;
+					});
+
+					res.on('end', () => {
+						const info = JSON.parse(resp);
+						msgs = msgs.concat(info.response.messages);
+
+						if(msgs.length >= numMsgs || msgs.length == count) {
+							cb(msgs);
+						} else {
+							ops.path = baseUrl + '&before_id=' + info.response.messages[info.response.messages.length - 1].id;
+							callback(msgs, ops, getMsgs);
+						}
+					});
+				}).on('error', e => {
+					throw e;
+				});
+		}
+		getMsgs([], options, getMsgs);
+	})
+	.catch(console.log);
 }
 
-function startGroupAnalysis(numMsgs, callback) {
-	if(typeof numMsgs === 'undefined' || numMsgs == null) {
-		numTotal = config.DEFAULT_MSGS_TO_ANALYZE;
-	} else {
-		numTotal = numMsgs;
-	}
-	finalFunction = analyzeGroup;
-	finalCallback = callback;
-	initGroup();
-}
-
-function startUserAnalysis(userIdsArray, numMsgs, callback) {
-	userIds = userIdsArray;
-	if(typeof numMsgs === 'undefined' || numMsgs == null) {
-		numTotal = config.DEFAULT_MSGS_TO_ANALYZE;
-	} else {
-		numTotal = numMsgs;
-	}
-	finalFunction = analyzeUser;
-	finalCallback = callback;
-	initGroup()
-}
-
-function analyzeGroup(msgs) {
-	console.log('analysing');
-	var returnStr,
+function analyzeGroup(msgs, cb) {
+	let returnStr,
 		sent = 0,
 		chars = 0,
 		liked = 0,
 		likes = 0,
-		selfLikes = 0;
+		selfLikes = 0,
+		maxLikes = 0,
+		maxLikesUser = 'None',
+		maxLikesPerc = 0,
+		maxLikesPercUser = 'None',
+		maxLikesPerc2 = 0,
+		maxLikesPercUser2 = 'None';
 
-	for(var i = 0; i < msgs.length; i++) {
-		if(userDict[msgs[i].sender_id]) {
+	msgs.forEach(msg => {
+		if(userDict[msg.sender_id]) {
+			userDict[msg.sender_id].sent++;
 			sent++;
-			if(msgs[i].text) {
-				chars += msgs[i].text.length;
+
+			if(msg.text) {
+				chars += msg.text.length;
 			}
-			if(msgs[i].favorited_by.length) {
+
+			if(msg.favorited_by.length) {
 				liked++;
-				likes += msgs[i].favorited_by.length;
-				if((msgs[i].favorited_by).indexOf(msgs[i].sender_id) > -1) {
+				userDict[msg.sender_id].liked_msgs++;
+				likes += msg.favorited_by.length;
+
+				if((msg.favorited_by).indexOf(msg.sender_id) > -1) {
 					selfLikes++;
+				}
+
+				userDict[msg.sender_id].likes_got += msg.favorited_by.length;
+				if(userDict[msg.sender_id].likes_got == maxLikes &&
+					maxLikesUser.indexOf(userDict[msg.sender_id].name) == -1) {
+					maxLikesUser += ' ' + userDict[msg.sender_id].name;
+				} else if(userDict[msg.sender_id].likes_got > maxLikes) {
+					maxLikes = userDict[msg.sender_id].likes_got;
+					maxLikesUser = userDict[msg.sender_id].name;
 				}
 			}
 		}
-	}
+	});
 
+	userDict.ids.forEach(id => {
+		if(userDict[id].liked_msgs / userDict[id].sent * 100 > maxLikesPerc) {
+			maxLikesPerc = userDict[id].liked_msgs / userDict[id].sent * 100;
+			maxLikesPercUser = userDict[id].name;
+		}
+	});
 
-	returnStr = sprintf("Analyzed %d msgs of %d total:\n"
-		+ "Avg msg length: %.3f\n"
-		+ "Avg likes per msg: %.3f\n"
-		+ "Liked msgs perc: %.3f perc\n"
-		+ "Avg likes per liked msg %.3f\n"
-		+ "Total likes: %d\n"
-		+ "Total self-likes: %d",
-		sent, count,
+	userDict.ids.forEach(id => {
+		if(userDict[id].name != maxLikesPercUser && userDict[id].liked_msgs / userDict[id].sent * 100 > maxLikesPerc2) {
+			maxLikesPerc2 = userDict[id].liked_msgs / userDict[id].sent * 100;
+			maxLikesPercUser2 = userDict[id].name;
+		}
+	});
+
+	cb(sprintf(`Analyzed ${sent} of ${count} total msgs:
+		%.1f avg message length
+		%.1f likes per message
+		%.1fp liked messages
+		%.1f likes per liked message
+		${likes} total likes
+		${selfLikes} self-likes
+
+		Most likes is ${maxLikesUser} with ${maxLikes} total likes.
+		Highest like efficiency is ${maxLikesPercUser} with %.1fp like rate.
+		Next hightest is ${maxLikesPercUser2} with %.1fp like rate.`,
 		chars / sent,
 		likes / sent,
 		liked / sent * 100,
 		likes / liked,
-		likes,
-		selfLikes);
-	
-	console.log("stats done");
-	finalCallback(returnStr);
+		maxLikesPerc,
+		maxLikesPerc2));
 }
 
-function analyzeUser(msgs) {
+function analyzeUsers(userIds, msgs, cb) {
 	var returnStr,
 		sent = 0,
 		chars = 0,
@@ -147,53 +180,48 @@ function analyzeUser(msgs) {
 		selfLikes = 0,
 		id;
 
-	for(var i = 0; i < msgs.length; i++) {
-		//id: [name, msgs sent, msg length, liked msgs, likes given, likes received, self-likes]
-		if(userDict[msgs[i].sender_id]) {
-			userDict[msgs[i].sender_id][1]++;
+	msgs.forEach(msg => {
+		if(userDict[msg.sender_id]) {
+			userDict[msg.sender_id].sent++;
 			sent++;
-			if(msgs[i].text) {
-				userDict[msgs[i].sender_id][2] += msgs[i].text.length;
-				chars += msgs[i].text.length;
+			if(msg.text) {
+				userDict[msg.sender_id].msg_length += msg.text.length;
+				chars += msg.text.length;
 			}
-			if(msgs[i].favorited_by.length) {
-				userDict[msgs[i].sender_id][3]++;
+			if(msg.favorited_by.length) {
+				userDict[msg.sender_id].liked_msgs++;
 				liked++;
-				likes += msgs[i].favorited_by.length;
-				for(var j = 0; j < msgs[i].favorited_by.length; j++) {
-					userDict[msgs[i].favorited_by[j]][4]++;
-					userDict[msgs[i].sender_id][5]++;
+				likes += msg.favorited_by.length;
+				for(var j = 0; j < msg.favorited_by.length; j++) {
+					userDict[msg.favorited_by[j]].likes_given++;
+					userDict[msg.sender_id].likes_got++;
 				}
-				if(msgs[i].favorited_by.indexOf(msgs[i].sender_id) > -1) {
-					userDict[msgs[i].sender_id][6]++;
+				if(msg.favorited_by.indexOf(msg.sender_id) > -1) {
+					userDict[msg.sender_id].self_likes++;
 					selfLikes++;
 				}
 			}
 		}
-	}
+	});
 
-	for(var i = 0; i < userIds.length; i++) {
-		var id = userIds[i];
-		returnStr = sprintf("Analyzed %d msgs of %d total:\n", sent, count);
-		returnStr += sprintf("Analysis for %s:\n", userDict[id][0]);
-		returnStr += sprintf("Sent msgs: %d (%.3f percent of all msgs)\n",
-			userDict[id][1], userDict[id][1] / sent * 100);
-		returnStr += sprintf("Avg msg length: %.3f (%.3f percent of all characters)\n",
-			userDict[id][2] / userDict[id][1], userDict[id][2] / chars * 100);
-		returnStr += sprintf("Avg likes received per msg: %.3f (%.3f perc of all likes)\n",
-			userDict[id][5] / userDict[id][1], userDict[id][5] / likes * 100);
-		returnStr += sprintf("Liked msgs perc: %.3f perc (%.3f perc of all likes given)\n",
-			userDict[id][3] / userDict[id][1] * 100, userDict[id][3] / liked * 100);
-		returnStr += sprintf("Avg likes received per liked msg: %.3f\n",
-			userDict[id][5] / userDict[id][3]);
-		returnStr += sprintf("Total likes given: %d (%.3f perc of all likes)\n",
-			userDict[id][4], userDict[id][4] / likes * 100);
-		returnStr += sprintf("Total self-likes: %d",
-			userDict[id][6]);
-
-		console.log("stats done");
-		finalCallback(returnStr);
-	}
+	userIds.forEach(id => {
+		cb(sprintf(`Analyzed ${sent} of ${count} total msgs:
+			${userDict[id].name}:
+			${userDict[id].sent} (%.1fp) sent messages
+			%.1f (%.1fp) avg message length
+			%.1f (%.1fp) likes per message
+			%.1f likes per liked message
+			%.1f (%.1fp) like message rate
+			${userDict[id].likes_given} (%.1fp) likes given
+			${userDict[id].self_likes} self-likes`,
+			userDict[id].sent / sent * 100,
+			userDict[id].msg_length / userDict[id].sent, userDict[id].msg_length / chars * 100,
+			userDict[id].likes_got / userDict[id].sent, userDict[id].likes_got / likes * 100,
+			userDict[id].likes_got / userDict[id].liked_msgs,
+			userDict[id].liked_msgs / userDict[id].sent * 100, userDict[id].liked_msgs / liked * 100,
+			userDict[id].likes_given / likes * 100
+		));
+	});
 }
 
 exports.startUserAnalysis = startUserAnalysis;

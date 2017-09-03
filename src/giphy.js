@@ -1,28 +1,53 @@
-var HTTP = require('http'),
-	config = require('./config.js');
+const HTTP = require('http'),
+			config = require('./config.js');
 
-function getRandom(search, callback) {
-    var url = 'http://api.giphy.com/v1/gifs/search?q=' + search + '&api_key=dc6zaTOxFJmzC';
+function getRandom(search, cb) {
+  const url = `http://api.giphy.com/v1/gifs/search?q=${search}&api_key=${config.GIPHY_API_KEY}`;
 
-	HTTP.get(url, function(res) {
-		var resp = "";
-        
-		res.on('data', function(chunk) {
+	HTTP.get(url, res => {
+		let resp = '';
+
+		res.on('data', chunk => {
 			resp += chunk;
 		});
 
-		res.on('end', function() {
-            try {
-                var info = JSON.parse(resp);
-                var gif = info.data[Math.floor(Math.random() * info.data.length)];
-				callback(gif.images.original.url);
-			} catch(err) {
+		res.on('end', () => {
+            const info = JSON.parse(resp);
+			if(info.data.length > 0)
+            	cb(info.data
+					[Math.floor(Math.random() * Math.min(info.data.length, 10))]
+					.images.fixed_height.url);
+			else
 				console.log('no gif found for tags: ' + search);
+		});
+	}).on('error', err => {
+		console.log("Got an error: ", err);
+	});
+}
+
+function getTrending(cb) {
+  const url = `http://api.giphy.com/v1/gifs/trending?api_key=${config.GIPHY_API_KEY}`;
+
+	HTTP.get(url, res => {
+		let resp = '';
+
+		res.on('data', chunk => {
+			resp += chunk;
+		});
+
+		res.on('end', () => {
+            const info = JSON.parse(resp);
+			if(info.data.length > 0) {
+            	cb(info.data[Math.floor(Math.random() * 10)]
+					.images.fixed_height.url);
+			} else {
+				console.log('no trending gif found');
 			}
 		});
-	}).on('error', function(e){
-		console.log("Got an error: ", e);
+	}).on('error', err => {
+		console.log("Got an error: ", err);
 	});
 }
 
 exports.getRandom = getRandom;
+exports.getTrending = getTrending;
