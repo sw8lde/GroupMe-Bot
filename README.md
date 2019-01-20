@@ -39,7 +39,7 @@ Fill out the form to create your new bot:
 
 ## Set up your bot:
 
-  * Clone this repository
+  * Clone or fork this repository
   * run `npm install`
   * Edit the `src/config.js` file with your Bot ID, Group ID, access token, and your Giphy API key
   * Edit the `app.json` file with your bot name, logo url, and repo url
