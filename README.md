@@ -17,8 +17,8 @@
   	* @stats @{user name} {number of messages to analyze}
   * Post gifs from Giphy
     * @gif {search term}
-  * Automaitcally like messages from specified senders
-  * Automaitcally add specified users back when then are kicked
+  * Automatically like messages from specified senders
+  * Automatically add specified users back when then are kicked
 
 # Get your bot up and running
 
