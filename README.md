@@ -13,21 +13,18 @@
     * @all
   	* @everyone
   	* @guys
-  * Display statistics on the group
-  	* @stats
-  	* @stats "number of messages to analyze"
-  	* @stats @"user name"
-  	* @stats @"user name" "number of messages to analyze"
+  * Display statistics on the group or users
+  	* @stats @{user name} {number of messages to analyze}
   * Post gifs from Giphy
-    * #"search term"
-    * #trending
+    * @gif {search term}
+  * Automaitcally like messages from specified senders
+  * Automaitcally add specified users back when then are kicked
 
 # Get your bot up and running
 
 ## Create a GroupMe Bot:
 
-Go to:
-https://dev.groupme.com/session/new
+Go to: https://dev.groupme.com/session/new
 
 Use your GroupMe credentials to log into the developer site.
 
@@ -42,7 +39,10 @@ Fill out the form to create your new bot:
 
 ## Set up your bot:
 
-Clone this repository and run `npm install`, and edit the config.js file. Add in the Bot ID, Group ID, and your access token. Add the code to your own repository, and then edit the app.json file. Change the logo to the url of the bot avatar, and change the repository to the url of your repository.
+  * Clone this repository
+  * run `npm install`
+  * Edit the `src/config.js` file with your Bot ID, Group ID, access token, and your Giphy API key
+  * Edit the `app.json` file with your bot name, logo url, and repo url
 
 ## Add your bot to your Heroku app:
 
