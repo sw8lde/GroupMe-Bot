@@ -1,15 +1,15 @@
-const http = require('http'),
-	    director = require('director'),
-	    bot = require('./bot.js'),
+const http = require('http');
+const director = require('director');
+const bot = require('./bot');
 
-  router = new director.http.Router({
+const router = new director.http.Router({
     '/' : {
       post: bot.respond,
       get: ping
     }
-  }),
+  });
 
-  server = http.createServer((req, res) => {
+const server = http.createServer((req, res) => {
     req.chunks = [];
     req.on('data', chunk => {
       req.chunks.push(chunk.toString());
@@ -19,9 +19,9 @@ const http = require('http'),
       res.writeHead(err.status, {"Content-Type": "text/plain"});
       res.end(err.message);
     });
-  }),
+  });
 
-	port = Number(process.env.PORT || 5000);
+const port = Number(process.env.PORT || 5000);
 
 server.listen(port);
 

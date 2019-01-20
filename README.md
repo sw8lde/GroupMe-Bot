@@ -6,7 +6,6 @@
   * Heroku account
   * GitHub account
   * Giphy API key
-  * [sprintf-js](https://www.npmjs.com/package/sprintf-js) for formatting the stats response
 
 ## What it does:
 
@@ -43,7 +42,7 @@ Fill out the form to create your new bot:
 
 ## Set up your bot:
 
-Clone this repository, and edit the config.js file. Add in the Bot ID, Group ID, and your access token. Add the code to your own repository, and then edit the app.json file. Change the logo to the url of the bot avatar, and change the repository to the url of your repository.
+Clone this repository and run `npm install`, and edit the config.js file. Add in the Bot ID, Group ID, and your access token. Add the code to your own repository, and then edit the app.json file. Change the logo to the url of the bot avatar, and change the repository to the url of your repository.
 
 ## Add your bot to your Heroku app:
 
